@@ -1,0 +1,49 @@
+name: Build NEXORA-CIRCLE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      zip_name:
+        description: "Zip file in repo root to apply first (leave empty to just build)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply zip (optional)
+        if: ${{ github.event.inputs.zip_name != '' }}
+        run: |
+          set -e
+          unzip -o "${{ github.event.inputs.zip_name }}" -d .
+          rm -f "${{ github.event.inputs.zip_name }}"
+          git config user.name "nexora-bot"
+          git config user.email "nexora-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply ${{ github.event.inputs.zip_name }}" || true
+          git push
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexora-circle-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
