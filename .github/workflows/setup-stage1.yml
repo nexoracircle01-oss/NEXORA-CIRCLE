@@ -1,0 +1,868 @@
+name: Setup Stage 1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  write-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write project files
+        run: |
+          set -e
+          mkdir -p app/src/main/java/com/nexora/circle/ui/theme
+          mkdir -p app/src/main/java/com/nexora/circle/ui/screens
+          mkdir -p app/src/main/java/com/nexora/circle/ui/components
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle.kts <<'NEXORA_EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "NEXORA-CIRCLE"
+          include(":app")
+          NEXORA_EOF
+
+          cat > build.gradle.kts <<'NEXORA_EOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.20" apply false
+              id("org.jetbrains.kotlin.plugin.compose") version "2.0.20" apply false
+              id("com.google.gms.google-services") version "4.4.2" apply false
+          }
+          NEXORA_EOF
+
+          cat > gradle.properties <<'NEXORA_EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          kotlin.code.style=official
+          NEXORA_EOF
+
+          cat > app/build.gradle.kts <<'NEXORA_EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+              id("org.jetbrains.kotlin.plugin.compose")
+          }
+
+          // Firebase is wired in Stage 2. The plugin only activates once a valid google-services.json exists.
+          if (file("google-services.json").exists()) {
+              apply(plugin = "com.google.gms.google-services")
+          }
+
+          android {
+              namespace = "com.nexora.circle"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.nexora.circle"
+                  minSdk = 24
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "0.1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = true
+                      isShrinkResources = true
+                      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+              buildFeatures {
+                  compose = true
+              }
+          }
+
+          dependencies {
+              val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
+              implementation(composeBom)
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.ui:ui-graphics")
+              implementation("androidx.compose.ui:ui-tooling-preview")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-extended")
+
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.activity:activity-compose:1.9.2")
+              implementation("androidx.navigation:navigation-compose:2.8.2")
+              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+              implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
+              implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+              debugImplementation("androidx.compose.ui:ui-tooling")
+          }
+          NEXORA_EOF
+
+          echo "# NEXORA-CIRCLE release rules" > app/proguard-rules.pro
+
+          cat > app/src/main/AndroidManifest.xml <<'NEXORA_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:allowBackup="false"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.Nexora">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          NEXORA_EOF
+
+          cat > app/src/main/res/values/strings.xml <<'NEXORA_EOF'
+          <resources>
+              <string name="app_name">NEXORA-CIRCLE</string>
+          </resources>
+          NEXORA_EOF
+
+          cat > app/src/main/res/values/colors.xml <<'NEXORA_EOF'
+          <resources>
+              <color name="nexora_bg">#0E0E12</color>
+          </resources>
+          NEXORA_EOF
+
+          cat > app/src/main/res/values/themes.xml <<'NEXORA_EOF'
+          <resources>
+              <style name="Theme.Nexora" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">@color/nexora_bg</item>
+              </style>
+          </resources>
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/MainActivity.kt <<'NEXORA_EOF'
+          package com.nexora.circle
+
+          import android.os.Bundle
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.activity.enableEdgeToEdge
+          import com.nexora.circle.ui.NexoraApp
+
+          class MainActivity : ComponentActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  enableEdgeToEdge()
+                  setContent { NexoraApp() }
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/theme/ThemeSettings.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.theme
+
+          enum class ThemeMode(val label: String) {
+              LIGHT("Light"),
+              DARK("Dark"),
+              OLED("OLED Black")
+          }
+
+          data class AccentPreset(val name: String, val argb: Int)
+
+          object AccentPresets {
+              val Pink = AccentPreset("Pink", 0xFFFF3EB5.toInt())
+              val Purple = AccentPreset("Purple", 0xFF9B6BFF.toInt())
+              val Blue = AccentPreset("Blue", 0xFF3E8BFF.toInt())
+              val Green = AccentPreset("Green", 0xFF2ECC8F.toInt())
+              val all = listOf(Pink, Purple, Blue, Green)
+          }
+
+          data class ThemeSettings(
+              val mode: ThemeMode = ThemeMode.DARK,
+              val accentArgb: Int = AccentPresets.Pink.argb,
+              val cornerRadiusDp: Int = 20,
+              val fontScale: Float = 1.0f
+          )
+
+          fun argbToHex(argb: Int): String = "%06X".format(argb and 0xFFFFFF)
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/theme/ThemeRepository.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.theme
+
+          import android.content.Context
+          import androidx.datastore.preferences.core.edit
+          import androidx.datastore.preferences.core.emptyPreferences
+          import androidx.datastore.preferences.core.floatPreferencesKey
+          import androidx.datastore.preferences.core.intPreferencesKey
+          import androidx.datastore.preferences.core.stringPreferencesKey
+          import androidx.datastore.preferences.preferencesDataStore
+          import kotlinx.coroutines.flow.Flow
+          import kotlinx.coroutines.flow.catch
+          import kotlinx.coroutines.flow.map
+          import java.io.IOException
+
+          private val Context.themeDataStore by preferencesDataStore(name = "nexora_theme")
+
+          class ThemeRepository(private val context: Context) {
+
+              private object Keys {
+                  val MODE = stringPreferencesKey("mode")
+                  val ACCENT = intPreferencesKey("accent")
+                  val CORNER = intPreferencesKey("corner")
+                  val FONT_SCALE = floatPreferencesKey("font_scale")
+              }
+
+              val settings: Flow<ThemeSettings> = context.themeDataStore.data
+                  .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+                  .map { p ->
+                      val defaults = ThemeSettings()
+                      ThemeSettings(
+                          mode = p[Keys.MODE]
+                              ?.let { name -> runCatching { ThemeMode.valueOf(name) }.getOrNull() }
+                              ?: defaults.mode,
+                          accentArgb = p[Keys.ACCENT] ?: defaults.accentArgb,
+                          cornerRadiusDp = p[Keys.CORNER] ?: defaults.cornerRadiusDp,
+                          fontScale = p[Keys.FONT_SCALE] ?: defaults.fontScale
+                      )
+                  }
+
+              suspend fun save(s: ThemeSettings) {
+                  context.themeDataStore.edit { p ->
+                      p[Keys.MODE] = s.mode.name
+                      p[Keys.ACCENT] = s.accentArgb
+                      p[Keys.CORNER] = s.cornerRadiusDp
+                      p[Keys.FONT_SCALE] = s.fontScale
+                  }
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/theme/ThemeViewModel.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.theme
+
+          import android.app.Application
+          import androidx.lifecycle.AndroidViewModel
+          import androidx.lifecycle.viewModelScope
+          import kotlinx.coroutines.flow.SharingStarted
+          import kotlinx.coroutines.flow.StateFlow
+          import kotlinx.coroutines.flow.stateIn
+          import kotlinx.coroutines.launch
+
+          class ThemeViewModel(app: Application) : AndroidViewModel(app) {
+              private val repository = ThemeRepository(app)
+
+              val settings: StateFlow<ThemeSettings> = repository.settings
+                  .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSettings())
+
+              fun save(settings: ThemeSettings) {
+                  viewModelScope.launch { repository.save(settings) }
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/theme/NexoraTheme.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.theme
+
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material3.ColorScheme
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Shapes
+          import androidx.compose.material3.Typography
+          import androidx.compose.material3.darkColorScheme
+          import androidx.compose.material3.lightColorScheme
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.CompositionLocalProvider
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.lerp
+          import androidx.compose.ui.graphics.luminance
+          import androidx.compose.ui.platform.LocalConfiguration
+          import androidx.compose.ui.platform.LocalDensity
+          import androidx.compose.ui.unit.Density
+          import androidx.compose.ui.unit.dp
+
+          fun buildColorScheme(s: ThemeSettings): ColorScheme {
+              val accent = Color(s.accentArgb)
+              val onAccent = if (accent.luminance() > 0.5f) Color.Black else Color.White
+              return when (s.mode) {
+                  ThemeMode.LIGHT -> lightColorScheme(
+                      primary = accent,
+                      onPrimary = onAccent,
+                      primaryContainer = lerp(Color.White, accent, 0.18f),
+                      onPrimaryContainer = Color(0xFF16161C),
+                      secondary = accent,
+                      onSecondary = onAccent,
+                      background = Color(0xFFFAF9FB),
+                      onBackground = Color(0xFF16161C),
+                      surface = Color.White,
+                      onSurface = Color(0xFF16161C),
+                      surfaceVariant = Color(0xFFEDEBF0),
+                      onSurfaceVariant = Color(0xFF5E5C66),
+                      outline = Color(0xFFCFCCD6),
+                      surfaceContainerLow = Color(0xFFF5F3F7),
+                      surfaceContainer = Color(0xFFF1EFF4),
+                      surfaceContainerHigh = Color(0xFFEDEBF0),
+                      surfaceContainerHighest = Color(0xFFE8E6EC)
+                  )
+
+                  ThemeMode.DARK -> darkColorScheme(
+                      primary = accent,
+                      onPrimary = onAccent,
+                      primaryContainer = lerp(Color(0xFF16161C), accent, 0.28f),
+                      onPrimaryContainer = Color(0xFFF2F2F6),
+                      secondary = accent,
+                      onSecondary = onAccent,
+                      background = Color(0xFF0E0E12),
+                      onBackground = Color(0xFFECECF1),
+                      surface = Color(0xFF16161C),
+                      onSurface = Color(0xFFECECF1),
+                      surfaceVariant = Color(0xFF22222B),
+                      onSurfaceVariant = Color(0xFFA9A8B3),
+                      outline = Color(0xFF3A3A46),
+                      surfaceContainerLow = Color(0xFF13131A),
+                      surfaceContainer = Color(0xFF181820),
+                      surfaceContainerHigh = Color(0xFF1E1E27),
+                      surfaceContainerHighest = Color(0xFF252530)
+                  )
+
+                  ThemeMode.OLED -> darkColorScheme(
+                      primary = accent,
+                      onPrimary = onAccent,
+                      primaryContainer = lerp(Color.Black, accent, 0.28f),
+                      onPrimaryContainer = Color(0xFFF2F2F6),
+                      secondary = accent,
+                      onSecondary = onAccent,
+                      background = Color.Black,
+                      onBackground = Color(0xFFECECF1),
+                      surface = Color(0xFF0A0A0A),
+                      onSurface = Color(0xFFECECF1),
+                      surfaceVariant = Color(0xFF1A1A1A),
+                      onSurfaceVariant = Color(0xFFA0A0A8),
+                      outline = Color(0xFF2E2E36),
+                      surfaceContainerLow = Color(0xFF050505),
+                      surfaceContainer = Color(0xFF0A0A0A),
+                      surfaceContainerHigh = Color(0xFF121212),
+                      surfaceContainerHighest = Color(0xFF1A1A1A)
+                  )
+              }
+          }
+
+          @Composable
+          fun NexoraTheme(settings: ThemeSettings, content: @Composable () -> Unit) {
+              val density = LocalDensity.current
+              val systemFontScale = LocalConfiguration.current.fontScale
+              val r = settings.cornerRadiusDp.toFloat()
+              val shapes = Shapes(
+                  extraSmall = RoundedCornerShape((r * 0.3f).dp),
+                  small = RoundedCornerShape((r * 0.6f).dp),
+                  medium = RoundedCornerShape(r.dp),
+                  large = RoundedCornerShape((r * 1.2f).dp),
+                  extraLarge = RoundedCornerShape((r * 1.6f).dp)
+              )
+              CompositionLocalProvider(
+                  LocalDensity provides Density(density.density, systemFontScale * settings.fontScale)
+              ) {
+                  MaterialTheme(
+                      colorScheme = buildColorScheme(settings),
+                      shapes = shapes,
+                      typography = Typography(),
+                      content = content
+                  )
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/components/StageScreen.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.components
+
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.text.style.TextAlign
+          import androidx.compose.ui.unit.dp
+
+          /** Honest placeholder for sections that are not built yet. Replaced stage by stage. */
+          @Composable
+          fun StageScreen(title: String, stage: Int, summary: String) {
+              Column(
+                  modifier = Modifier.fillMaxSize().padding(32.dp),
+                  verticalArrangement = Arrangement.Center,
+                  horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                  Text(title, style = MaterialTheme.typography.headlineMedium)
+                  Text(
+                      "Not built yet. Planned for Stage $stage.",
+                      style = MaterialTheme.typography.labelLarge,
+                      color = MaterialTheme.colorScheme.primary,
+                      modifier = Modifier.padding(top = 8.dp)
+                  )
+                  Text(
+                      summary,
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      textAlign = TextAlign.Center,
+                      modifier = Modifier.padding(top = 12.dp)
+                  )
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/screens/PlaceholderScreens.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.screens
+
+          import androidx.compose.runtime.Composable
+          import com.nexora.circle.ui.components.StageScreen
+
+          @Composable
+          fun ProfileScreen() = StageScreen(
+              title = "Profile",
+              stage = 3,
+              summary = "Your profile, achievements, Signals and privacy controls will live here."
+          )
+
+          @Composable
+          fun OrbitScreen() = StageScreen(
+              title = "Orbit",
+              stage = 4,
+              summary = "Join, create and moderate communities here."
+          )
+
+          @Composable
+          fun FeedScreen() = StageScreen(
+              title = "Feed",
+              stage = 5,
+              summary = "Discover Signals and send your own here."
+          )
+
+          @Composable
+          fun BeemScreen() = StageScreen(
+              title = "Beem",
+              stage = 6,
+              summary = "Private one-to-one and group Beems will live here."
+          )
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/screens/SettingsScreen.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.screens
+
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.lazy.LazyColumn
+          import androidx.compose.material3.HorizontalDivider
+          import androidx.compose.material3.ListItem
+          import androidx.compose.material3.ListItemDefaults
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.alpha
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.unit.dp
+
+          private val laterItems = listOf(
+              "Account",
+              "Privacy & Security",
+              "Login & Authentication",
+              "Two-Factor Authentication",
+              "Anonymous Mode",
+              "Notifications",
+              "Blocked Accounts",
+              "Language",
+              "Data & Storage",
+              "Delete Account",
+              "Help & Support",
+              "About NEXORA-CIRCLE"
+          )
+
+          @Composable
+          fun SettingsScreen(onOpenAppearance: () -> Unit) {
+              val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
+              LazyColumn(modifier = Modifier.fillMaxSize()) {
+                  item {
+                      Text(
+                          "Settings",
+                          style = MaterialTheme.typography.headlineMedium,
+                          modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 12.dp)
+                      )
+                  }
+                  item {
+                      ListItem(
+                          headlineContent = { Text("Appearance & Theme") },
+                          supportingContent = { Text("Mode, accent color, card shape and text size") },
+                          colors = transparent,
+                          modifier = Modifier.clickable(onClick = onOpenAppearance)
+                      )
+                      HorizontalDivider()
+                  }
+                  laterItems.forEach { name ->
+                      item {
+                          ListItem(
+                              headlineContent = { Text(name) },
+                              supportingContent = { Text("Coming in a later stage") },
+                              colors = transparent,
+                              modifier = Modifier.alpha(0.5f)
+                          )
+                      }
+                  }
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/screens/AppearanceScreen.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.screens
+
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.rememberScrollState
+          import androidx.compose.foundation.shape.CircleShape
+          import androidx.compose.foundation.verticalScroll
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+          import androidx.compose.material3.Button
+          import androidx.compose.material3.Card
+          import androidx.compose.material3.CardDefaults
+          import androidx.compose.material3.FilterChip
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.IconButton
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.OutlinedButton
+          import androidx.compose.material3.OutlinedTextField
+          import androidx.compose.material3.Slider
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.semantics.contentDescription
+          import androidx.compose.ui.semantics.semantics
+          import androidx.compose.ui.unit.dp
+          import com.nexora.circle.ui.theme.AccentPresets
+          import com.nexora.circle.ui.theme.NexoraTheme
+          import com.nexora.circle.ui.theme.ThemeMode
+          import com.nexora.circle.ui.theme.ThemeSettings
+          import com.nexora.circle.ui.theme.argbToHex
+          import kotlin.math.roundToInt
+
+          @Composable
+          fun AppearanceScreen(
+              current: ThemeSettings,
+              onSave: (ThemeSettings) -> Unit,
+              onBack: () -> Unit
+          ) {
+              var draft by remember(current) { mutableStateOf(current) }
+              var hex by remember(current) { mutableStateOf(argbToHex(current.accentArgb)) }
+
+              Column(
+                  modifier = Modifier
+                      .fillMaxSize()
+                      .verticalScroll(rememberScrollState())
+                      .padding(horizontal = 20.dp)
+              ) {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                      IconButton(onClick = onBack) {
+                          Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                      }
+                      Text("Appearance & Theme", style = MaterialTheme.typography.titleLarge)
+                  }
+                  Spacer(Modifier.height(12.dp))
+
+                  ThemePreview(draft)
+
+                  SectionTitle("Mode")
+                  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      ThemeMode.entries.forEach { m ->
+                          FilterChip(
+                              selected = draft.mode == m,
+                              onClick = { draft = draft.copy(mode = m) },
+                              label = { Text(m.label) }
+                          )
+                      }
+                  }
+
+                  SectionTitle("Accent color")
+                  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                      AccentPresets.all.forEach { p ->
+                          AccentDot(
+                              name = p.name,
+                              color = Color(p.argb),
+                              selected = draft.accentArgb == p.argb
+                          ) {
+                              draft = draft.copy(accentArgb = p.argb)
+                              hex = argbToHex(p.argb)
+                          }
+                      }
+                  }
+                  Spacer(Modifier.height(12.dp))
+                  OutlinedTextField(
+                      value = hex,
+                      onValueChange = { input ->
+                          hex = input.uppercase().filter { it in "0123456789ABCDEF" }.take(6)
+                          if (hex.length == 6) {
+                              draft = draft.copy(accentArgb = 0xFF000000.toInt() or hex.toInt(16))
+                          }
+                      },
+                      label = { Text("Custom accent (HEX)") },
+                      prefix = { Text("#") },
+                      singleLine = true,
+                      modifier = Modifier.fillMaxWidth()
+                  )
+
+                  SectionTitle("Card roundness: ${draft.cornerRadiusDp} dp")
+                  Slider(
+                      value = draft.cornerRadiusDp.toFloat(),
+                      onValueChange = { draft = draft.copy(cornerRadiusDp = it.roundToInt()) },
+                      valueRange = 8f..32f
+                  )
+
+                  SectionTitle("Text size: ${(draft.fontScale * 100).roundToInt()}%")
+                  Slider(
+                      value = draft.fontScale,
+                      onValueChange = { draft = draft.copy(fontScale = (it * 20).roundToInt() / 20f) },
+                      valueRange = 0.85f..1.3f
+                  )
+
+                  Spacer(Modifier.height(16.dp))
+                  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                      OutlinedButton(onClick = {
+                          draft = ThemeSettings()
+                          hex = argbToHex(draft.accentArgb)
+                      }) { Text("Reset") }
+                      Button(
+                          onClick = { onSave(draft) },
+                          enabled = draft != current
+                      ) { Text("Save theme") }
+                  }
+                  Spacer(Modifier.height(32.dp))
+              }
+          }
+
+          @Composable
+          private fun SectionTitle(text: String) {
+              Text(
+                  text,
+                  style = MaterialTheme.typography.titleSmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
+              )
+          }
+
+          @Composable
+          private fun AccentDot(name: String, color: Color, selected: Boolean, onClick: () -> Unit) {
+              Spacer(
+                  Modifier
+                      .size(44.dp)
+                      .clip(CircleShape)
+                      .background(color)
+                      .then(
+                          if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                          else Modifier
+                      )
+                      .clickable(onClick = onClick)
+                      .semantics { contentDescription = name }
+              )
+          }
+
+          @Composable
+          private fun ThemePreview(settings: ThemeSettings) {
+              NexoraTheme(settings) {
+                  val c = MaterialTheme.colorScheme
+                  Column(
+                      modifier = Modifier
+                          .fillMaxWidth()
+                          .clip(MaterialTheme.shapes.large)
+                          .background(c.background)
+                          .border(1.dp, c.outline.copy(alpha = 0.5f), MaterialTheme.shapes.large)
+                          .padding(16.dp),
+                      verticalArrangement = Arrangement.spacedBy(12.dp)
+                  ) {
+                      Text("Preview", style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
+                      Card(
+                          colors = CardDefaults.cardColors(containerColor = c.surface),
+                          modifier = Modifier.fillMaxWidth()
+                      ) {
+                          Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                              Text("Orbit of curious minds", style = MaterialTheme.typography.titleMedium, color = c.onSurface)
+                              Text(
+                                  "A calm space for ideas, science and creativity.",
+                                  style = MaterialTheme.typography.bodyMedium,
+                                  color = c.onSurfaceVariant
+                              )
+                              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                  Button(onClick = {}) { Text("Send Signal") }
+                                  OutlinedButton(onClick = {}) { Text("Join") }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/NexoraApp.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui
+
+          import android.app.Activity
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.outlined.ChatBubbleOutline
+          import androidx.compose.material.icons.outlined.Explore
+          import androidx.compose.material.icons.outlined.Person
+          import androidx.compose.material.icons.outlined.Public
+          import androidx.compose.material.icons.outlined.Settings
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.NavigationBar
+          import androidx.compose.material3.NavigationBarItem
+          import androidx.compose.material3.Scaffold
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.SideEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.vector.ImageVector
+          import androidx.compose.ui.platform.LocalView
+          import androidx.core.view.WindowCompat
+          import androidx.lifecycle.compose.collectAsStateWithLifecycle
+          import androidx.lifecycle.viewmodel.compose.viewModel
+          import androidx.navigation.NavGraph.Companion.findStartDestination
+          import androidx.navigation.compose.NavHost
+          import androidx.navigation.compose.composable
+          import androidx.navigation.compose.currentBackStackEntryAsState
+          import androidx.navigation.compose.rememberNavController
+          import com.nexora.circle.ui.screens.AppearanceScreen
+          import com.nexora.circle.ui.screens.BeemScreen
+          import com.nexora.circle.ui.screens.FeedScreen
+          import com.nexora.circle.ui.screens.OrbitScreen
+          import com.nexora.circle.ui.screens.ProfileScreen
+          import com.nexora.circle.ui.screens.SettingsScreen
+          import com.nexora.circle.ui.theme.NexoraTheme
+          import com.nexora.circle.ui.theme.ThemeMode
+          import com.nexora.circle.ui.theme.ThemeViewModel
+
+          enum class Destination(val route: String, val label: String, val icon: ImageVector) {
+              PROFILE("profile", "Profile", Icons.Outlined.Person),
+              ORBIT("orbit", "Orbit", Icons.Outlined.Public),
+              FEED("feed", "Feed", Icons.Outlined.Explore),
+              BEEM("beem", "Beem", Icons.Outlined.ChatBubbleOutline),
+              SETTINGS("settings", "Settings", Icons.Outlined.Settings)
+          }
+
+          private const val ROUTE_APPEARANCE = "settings/appearance"
+
+          @Composable
+          fun NexoraApp(themeViewModel: ThemeViewModel = viewModel()) {
+              val settings by themeViewModel.settings.collectAsStateWithLifecycle()
+
+              // Keep system bar icons readable for the chosen theme.
+              val view = LocalView.current
+              SideEffect {
+                  val window = (view.context as? Activity)?.window ?: return@SideEffect
+                  val controller = WindowCompat.getInsetsController(window, view)
+                  val light = settings.mode == ThemeMode.LIGHT
+                  controller.isAppearanceLightStatusBars = light
+                  controller.isAppearanceLightNavigationBars = light
+              }
+
+              NexoraTheme(settings) {
+                  val nav = rememberNavController()
+                  val backStackEntry by nav.currentBackStackEntryAsState()
+                  val currentRoute = backStackEntry?.destination?.route
+
+                  Scaffold(
+                      containerColor = MaterialTheme.colorScheme.background,
+                      bottomBar = {
+                          NavigationBar {
+                              Destination.entries.forEach { d ->
+                                  NavigationBarItem(
+                                      selected = currentRoute?.startsWith(d.route) == true,
+                                      onClick = {
+                                          nav.navigate(d.route) {
+                                              popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                              launchSingleTop = true
+                                              restoreState = true
+                                          }
+                                      },
+                                      icon = { Icon(d.icon, contentDescription = d.label) },
+                                      label = { Text(d.label) }
+                                  )
+                              }
+                          }
+                      }
+                  ) { inner ->
+                      NavHost(
+                          navController = nav,
+                          startDestination = Destination.PROFILE.route,
+                          modifier = Modifier.padding(inner)
+                      ) {
+                          composable(Destination.PROFILE.route) { ProfileScreen() }
+                          composable(Destination.ORBIT.route) { OrbitScreen() }
+                          composable(Destination.FEED.route) { FeedScreen() }
+                          composable(Destination.BEEM.route) { BeemScreen() }
+                          composable(Destination.SETTINGS.route) {
+                              SettingsScreen(onOpenAppearance = { nav.navigate(ROUTE_APPEARANCE) })
+                          }
+                          composable(ROUTE_APPEARANCE) {
+                              AppearanceScreen(
+                                  current = settings,
+                                  onSave = themeViewModel::save,
+                                  onBack = { nav.popBackStack() }
+                              )
+                          }
+                      }
+                  }
+              }
+          }
+          NEXORA_EOF
+
+      - name: Commit files
+        run: |
+          git config user.name "nexora-bot"
+          git config user.email "nexora-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Add Stage 1 project files" || true
+          git push
