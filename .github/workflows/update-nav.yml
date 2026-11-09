@@ -1,0 +1,645 @@
+name: Update Navigation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  write-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write updated files
+        run: |
+          set -e
+          mkdir -p app/src/main/java/com/nexora/circle/ui/navigation
+          mkdir -p app/src/main/java/com/nexora/circle/ui/components
+          mkdir -p app/src/main/java/com/nexora/circle/ui/screens
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/values
+
+          cat > app/src/main/AndroidManifest.xml <<'NEXORA_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:allowBackup="false"
+                  android:label="@string/app_name"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.Nexora">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.app.shortcuts"
+                          android:resource="@xml/shortcuts" />
+                  </activity>
+              </application>
+          </manifest>
+          NEXORA_EOF
+
+          cat > app/src/main/res/xml/shortcuts.xml <<'NEXORA_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+              <shortcut
+                  android:shortcutId="beams"
+                  android:enabled="true"
+                  android:shortcutShortLabel="@string/shortcut_beams"
+                  android:shortcutLongLabel="@string/shortcut_beams">
+                  <intent
+                      android:action="android.intent.action.VIEW"
+                      android:targetPackage="com.nexora.circle"
+                      android:targetClass="com.nexora.circle.MainActivity">
+                      <extra android:name="route" android:value="beams" />
+                  </intent>
+              </shortcut>
+              <shortcut
+                  android:shortcutId="notifications"
+                  android:enabled="true"
+                  android:shortcutShortLabel="@string/shortcut_notifications_short"
+                  android:shortcutLongLabel="@string/shortcut_notifications_long">
+                  <intent
+                      android:action="android.intent.action.VIEW"
+                      android:targetPackage="com.nexora.circle"
+                      android:targetClass="com.nexora.circle.MainActivity">
+                      <extra android:name="route" android:value="notifications" />
+                  </intent>
+              </shortcut>
+              <shortcut
+                  android:shortcutId="profile"
+                  android:enabled="true"
+                  android:shortcutShortLabel="@string/shortcut_profile"
+                  android:shortcutLongLabel="@string/shortcut_profile">
+                  <intent
+                      android:action="android.intent.action.VIEW"
+                      android:targetPackage="com.nexora.circle"
+                      android:targetClass="com.nexora.circle.MainActivity">
+                      <extra android:name="route" android:value="profile" />
+                  </intent>
+              </shortcut>
+          </shortcuts>
+          NEXORA_EOF
+
+          cat > app/src/main/res/values/strings.xml <<'NEXORA_EOF'
+          <resources>
+              <string name="app_name">NEXORA-CIRCLE</string>
+              <string name="shortcut_beams">Beams</string>
+              <string name="shortcut_notifications_short">Alerts</string>
+              <string name="shortcut_notifications_long">Notifications</string>
+              <string name="shortcut_profile">Profile</string>
+          </resources>
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/MainActivity.kt <<'NEXORA_EOF'
+          package com.nexora.circle
+
+          import android.content.Intent
+          import android.os.Bundle
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.activity.enableEdgeToEdge
+          import androidx.compose.runtime.mutableStateOf
+          import com.nexora.circle.ui.NexoraApp
+
+          class MainActivity : ComponentActivity() {
+
+              private val pendingRoute = mutableStateOf<String?>(null)
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  enableEdgeToEdge()
+                  pendingRoute.value = intent?.getStringExtra("route")
+                  setContent {
+                      NexoraApp(
+                          requestedRoute = pendingRoute.value,
+                          onRouteHandled = { pendingRoute.value = null }
+                      )
+                  }
+              }
+
+              override fun onNewIntent(intent: Intent) {
+                  super.onNewIntent(intent)
+                  pendingRoute.value = intent.getStringExtra("route")
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/navigation/Destination.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.navigation
+
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.filled.ChatBubble
+          import androidx.compose.material.icons.filled.Notifications
+          import androidx.compose.material.icons.filled.Person
+          import androidx.compose.material.icons.filled.Public
+          import androidx.compose.material.icons.outlined.ChatBubbleOutline
+          import androidx.compose.material.icons.outlined.Notifications
+          import androidx.compose.material.icons.outlined.Person
+          import androidx.compose.material.icons.outlined.Public
+          import androidx.compose.ui.graphics.vector.ImageVector
+
+          /** Bottom bar tabs, left to right. Settings lives in the top bar. */
+          enum class Destination(
+              val route: String,
+              val label: String,
+              val icon: ImageVector,
+              val selectedIcon: ImageVector
+          ) {
+              ORBIT("orbit", "Orbit", Icons.Outlined.Public, Icons.Filled.Public),
+              BEAMS("beams", "Beams", Icons.Outlined.ChatBubbleOutline, Icons.Filled.ChatBubble),
+              NOTIFICATIONS("notifications", "Notifications", Icons.Outlined.Notifications, Icons.Filled.Notifications),
+              PROFILE("profile", "Profile", Icons.Outlined.Person, Icons.Filled.Person)
+          }
+
+          object Routes {
+              const val SETTINGS = "settings"
+              const val APPEARANCE = "settings/appearance"
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/components/NexoraBars.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.components
+
+          import android.view.SoundEffectConstants
+          import androidx.compose.animation.animateColorAsState
+          import androidx.compose.animation.core.Spring
+          import androidx.compose.animation.core.animateFloatAsState
+          import androidx.compose.animation.core.spring
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.interaction.MutableInteractionSource
+          import androidx.compose.foundation.interaction.collectIsPressedAsState
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.navigationBarsPadding
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.layout.statusBarsPadding
+          import androidx.compose.foundation.shape.CircleShape
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.outlined.Settings
+          import androidx.compose.material3.HorizontalDivider
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Surface
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.remember
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+          import androidx.compose.ui.platform.LocalHapticFeedback
+          import androidx.compose.ui.platform.LocalView
+          import androidx.compose.ui.semantics.Role
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.nexora.circle.ui.navigation.Destination
+
+          /** Light click sound (follows the phone's touch-sound setting) plus a soft haptic tick. */
+          @Composable
+          fun rememberTouchFeedback(): () -> Unit {
+              val view = LocalView.current
+              val haptic = LocalHapticFeedback.current
+              val action: () -> Unit = remember(view, haptic) {
+                  {
+                      view.playSoundEffect(SoundEffectConstants.CLICK)
+                      haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                  }
+              }
+              return action
+          }
+
+          @Composable
+          fun NexoraTopBar(title: String, onSettingsClick: () -> Unit) {
+              val feedback = rememberTouchFeedback()
+              Row(
+                  modifier = Modifier
+                      .fillMaxWidth()
+                      .statusBarsPadding()
+                      .height(52.dp)
+                      .padding(horizontal = 20.dp),
+                  verticalAlignment = Alignment.CenterVertically
+              ) {
+                  Text(
+                      text = title,
+                      style = MaterialTheme.typography.titleLarge,
+                      fontWeight = FontWeight.SemiBold,
+                      modifier = Modifier.weight(1f)
+                  )
+                  PressableIcon(
+                      icon = Icons.Outlined.Settings,
+                      description = "Settings",
+                      onClick = {
+                          feedback()
+                          onSettingsClick()
+                      }
+                  )
+              }
+          }
+
+          @Composable
+          private fun PressableIcon(
+              icon: androidx.compose.ui.graphics.vector.ImageVector,
+              description: String,
+              onClick: () -> Unit
+          ) {
+              val interaction = remember { MutableInteractionSource() }
+              val pressed by interaction.collectIsPressedAsState()
+              val scale by animateFloatAsState(
+                  targetValue = if (pressed) 0.85f else 1f,
+                  animationSpec = spring(
+                      dampingRatio = Spring.DampingRatioMediumBouncy,
+                      stiffness = Spring.StiffnessMedium
+                  ),
+                  label = "iconScale"
+              )
+              Box(
+                  modifier = Modifier
+                      .size(44.dp)
+                      .graphicsLayer {
+                          scaleX = scale
+                          scaleY = scale
+                      }
+                      .clip(CircleShape)
+                      .clickable(
+                          interactionSource = interaction,
+                          indication = null,
+                          role = Role.Button,
+                          onClick = onClick
+                      ),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Icon(
+                      imageVector = icon,
+                      contentDescription = description,
+                      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                      modifier = Modifier.size(20.dp)
+                  )
+              }
+          }
+
+          @Composable
+          fun NexoraBottomBar(currentRoute: String?, onSelect: (Destination) -> Unit) {
+              Surface(
+                  color = MaterialTheme.colorScheme.surfaceContainer,
+                  modifier = Modifier.fillMaxWidth()
+              ) {
+                  Column {
+                      HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                      Row(
+                          modifier = Modifier
+                              .fillMaxWidth()
+                              .navigationBarsPadding()
+                              .height(56.dp),
+                          horizontalArrangement = Arrangement.SpaceAround,
+                          verticalAlignment = Alignment.CenterVertically
+                      ) {
+                          Destination.entries.forEach { d ->
+                              BarItem(
+                                  destination = d,
+                                  selected = currentRoute == d.route,
+                                  onClick = { onSelect(d) },
+                                  modifier = Modifier.weight(1f)
+                              )
+                          }
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun BarItem(
+              destination: Destination,
+              selected: Boolean,
+              onClick: () -> Unit,
+              modifier: Modifier
+          ) {
+              val feedback = rememberTouchFeedback()
+              val interaction = remember { MutableInteractionSource() }
+              val pressed by interaction.collectIsPressedAsState()
+              val primary = MaterialTheme.colorScheme.primary
+
+              val scale by animateFloatAsState(
+                  targetValue = if (pressed) 0.88f else if (selected) 1.06f else 1f,
+                  animationSpec = spring(
+                      dampingRatio = Spring.DampingRatioMediumBouncy,
+                      stiffness = Spring.StiffnessMedium
+                  ),
+                  label = "tabScale"
+              )
+              val pillAlpha by animateFloatAsState(
+                  targetValue = if (selected) 0.18f else 0f,
+                  label = "tabPill"
+              )
+              val tint by animateColorAsState(
+                  targetValue = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                  label = "tabTint"
+              )
+
+              Column(
+                  modifier = modifier
+                      .fillMaxHeight()
+                      .clickable(
+                          interactionSource = interaction,
+                          indication = null,
+                          role = Role.Tab,
+                          onClick = {
+                              feedback()
+                              onClick()
+                          }
+                      )
+                      .graphicsLayer {
+                          scaleX = scale
+                          scaleY = scale
+                      },
+                  horizontalAlignment = Alignment.CenterHorizontally,
+                  verticalArrangement = Arrangement.Center
+              ) {
+                  Box(
+                      modifier = Modifier
+                          .size(width = 40.dp, height = 24.dp)
+                          .clip(RoundedCornerShape(12.dp))
+                          .background(primary.copy(alpha = pillAlpha)),
+                      contentAlignment = Alignment.Center
+                  ) {
+                      Icon(
+                          imageVector = if (selected) destination.selectedIcon else destination.icon,
+                          contentDescription = destination.label,
+                          tint = tint,
+                          modifier = Modifier.size(20.dp)
+                      )
+                  }
+                  Spacer(Modifier.height(2.dp))
+                  Text(
+                      text = destination.label,
+                      fontSize = 10.sp,
+                      color = tint,
+                      fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                      maxLines = 1
+                  )
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/NexoraApp.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui
+
+          import android.app.Activity
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Scaffold
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.SideEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.platform.LocalView
+          import androidx.core.view.WindowCompat
+          import androidx.lifecycle.compose.collectAsStateWithLifecycle
+          import androidx.lifecycle.viewmodel.compose.viewModel
+          import androidx.navigation.NavGraph.Companion.findStartDestination
+          import androidx.navigation.compose.NavHost
+          import androidx.navigation.compose.composable
+          import androidx.navigation.compose.currentBackStackEntryAsState
+          import androidx.navigation.compose.rememberNavController
+          import com.nexora.circle.ui.components.NexoraBottomBar
+          import com.nexora.circle.ui.components.NexoraTopBar
+          import com.nexora.circle.ui.navigation.Destination
+          import com.nexora.circle.ui.navigation.Routes
+          import com.nexora.circle.ui.screens.AppearanceScreen
+          import com.nexora.circle.ui.screens.BeamsScreen
+          import com.nexora.circle.ui.screens.NotificationsScreen
+          import com.nexora.circle.ui.screens.OrbitScreen
+          import com.nexora.circle.ui.screens.ProfileScreen
+          import com.nexora.circle.ui.screens.SettingsScreen
+          import com.nexora.circle.ui.theme.NexoraTheme
+          import com.nexora.circle.ui.theme.ThemeMode
+          import com.nexora.circle.ui.theme.ThemeViewModel
+
+          @Composable
+          fun NexoraApp(
+              requestedRoute: String? = null,
+              onRouteHandled: () -> Unit = {},
+              themeViewModel: ThemeViewModel = viewModel()
+          ) {
+              val settings by themeViewModel.settings.collectAsStateWithLifecycle()
+
+              // Keep system bar icons readable for the chosen theme.
+              val view = LocalView.current
+              SideEffect {
+                  val window = (view.context as? Activity)?.window ?: return@SideEffect
+                  val controller = WindowCompat.getInsetsController(window, view)
+                  val light = settings.mode == ThemeMode.LIGHT
+                  controller.isAppearanceLightStatusBars = light
+                  controller.isAppearanceLightNavigationBars = light
+              }
+
+              NexoraTheme(settings) {
+                  val nav = rememberNavController()
+                  val backStackEntry by nav.currentBackStackEntryAsState()
+                  val currentRoute = backStackEntry?.destination?.route
+                  val currentTab = Destination.entries.firstOrNull { it.route == currentRoute }
+
+                  fun openTab(d: Destination) {
+                      nav.navigate(d.route) {
+                          popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                          launchSingleTop = true
+                          restoreState = true
+                      }
+                  }
+
+                  // Launcher shortcuts: only known tab routes are accepted.
+                  LaunchedEffect(requestedRoute) {
+                      if (requestedRoute != null) {
+                          Destination.entries.firstOrNull { it.route == requestedRoute }
+                              ?.let { openTab(it) }
+                          onRouteHandled()
+                      }
+                  }
+
+                  Scaffold(
+                      containerColor = MaterialTheme.colorScheme.background,
+                      topBar = {
+                          if (currentTab != null) {
+                              NexoraTopBar(
+                                  title = currentTab.label,
+                                  onSettingsClick = {
+                                      nav.navigate(Routes.SETTINGS) { launchSingleTop = true }
+                                  }
+                              )
+                          }
+                      },
+                      bottomBar = {
+                          NexoraBottomBar(
+                              currentRoute = currentRoute,
+                              onSelect = { openTab(it) }
+                          )
+                      }
+                  ) { inner ->
+                      NavHost(
+                          navController = nav,
+                          startDestination = Destination.ORBIT.route,
+                          modifier = Modifier.padding(inner)
+                      ) {
+                          composable(Destination.ORBIT.route) { OrbitScreen() }
+                          composable(Destination.BEAMS.route) { BeamsScreen() }
+                          composable(Destination.NOTIFICATIONS.route) { NotificationsScreen() }
+                          composable(Destination.PROFILE.route) { ProfileScreen() }
+                          composable(Routes.SETTINGS) {
+                              SettingsScreen(
+                                  onBack = { nav.popBackStack() },
+                                  onOpenAppearance = { nav.navigate(Routes.APPEARANCE) }
+                              )
+                          }
+                          composable(Routes.APPEARANCE) {
+                              AppearanceScreen(
+                                  current = settings,
+                                  onSave = themeViewModel::save,
+                                  onBack = { nav.popBackStack() }
+                              )
+                          }
+                      }
+                  }
+              }
+          }
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/screens/PlaceholderScreens.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.screens
+
+          import androidx.compose.runtime.Composable
+          import com.nexora.circle.ui.components.StageScreen
+
+          @Composable
+          fun OrbitScreen() = StageScreen(
+              title = "Orbit",
+              stage = 4,
+              summary = "Join, create and moderate communities here."
+          )
+
+          @Composable
+          fun BeamsScreen() = StageScreen(
+              title = "Beams",
+              stage = 6,
+              summary = "Private one-to-one and group Beams will live here."
+          )
+
+          @Composable
+          fun NotificationsScreen() = StageScreen(
+              title = "Notifications",
+              stage = 6,
+              summary = "Your alerts and activity will appear here."
+          )
+
+          @Composable
+          fun ProfileScreen() = StageScreen(
+              title = "Profile",
+              stage = 3,
+              summary = "Your profile, achievements, Signals and privacy controls will live here."
+          )
+          NEXORA_EOF
+
+          cat > app/src/main/java/com/nexora/circle/ui/screens/SettingsScreen.kt <<'NEXORA_EOF'
+          package com.nexora.circle.ui.screens
+
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.lazy.LazyColumn
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+          import androidx.compose.material3.HorizontalDivider
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.IconButton
+          import androidx.compose.material3.ListItem
+          import androidx.compose.material3.ListItemDefaults
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.alpha
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.unit.dp
+
+          private val laterItems = listOf(
+              "Account",
+              "Privacy & Security",
+              "Login & Authentication",
+              "Two-Factor Authentication",
+              "Anonymous Mode",
+              "Notifications",
+              "Blocked Accounts",
+              "Language",
+              "Data & Storage",
+              "Delete Account",
+              "Help & Support",
+              "About NEXORA-CIRCLE"
+          )
+
+          @Composable
+          fun SettingsScreen(onBack: () -> Unit, onOpenAppearance: () -> Unit) {
+              val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
+              LazyColumn(modifier = Modifier.fillMaxSize()) {
+                  item {
+                      Row(
+                          verticalAlignment = Alignment.CenterVertically,
+                          modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp)
+                      ) {
+                          IconButton(onClick = onBack) {
+                              Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                          }
+                          Text("Settings", style = MaterialTheme.typography.titleLarge)
+                      }
+                  }
+                  item {
+                      ListItem(
+                          headlineContent = { Text("Appearance & Theme") },
+                          supportingContent = { Text("Mode, accent color, card shape and text size") },
+                          colors = transparent,
+                          modifier = Modifier.clickable(onClick = onOpenAppearance)
+                      )
+                      HorizontalDivider()
+                  }
+                  laterItems.forEach { name ->
+                      item {
+                          ListItem(
+                              headlineContent = { Text(name) },
+                              supportingContent = { Text("Coming in a later stage") },
+                              colors = transparent,
+                              modifier = Modifier.alpha(0.5f)
+                          )
+                      }
+                  }
+              }
+          }
+          NEXORA_EOF
+
+      - name: Commit files
+        run: |
+          git config user.name "nexora-bot"
+          git config user.email "nexora-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Update navigation: Beams, Notifications, top-right Settings, shortcuts" || true
+          git push
