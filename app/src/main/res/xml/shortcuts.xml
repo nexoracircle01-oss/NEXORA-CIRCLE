@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="beams"
+        android:enabled="true"
+        android:shortcutShortLabel="@string/shortcut_beams"
+        android:shortcutLongLabel="@string/shortcut_beams">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.nexora.circle"
+            android:targetClass="com.nexora.circle.MainActivity">
+            <extra android:name="route" android:value="beams" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="notifications"
+        android:enabled="true"
+        android:shortcutShortLabel="@string/shortcut_notifications_short"
+        android:shortcutLongLabel="@string/shortcut_notifications_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.nexora.circle"
+            android:targetClass="com.nexora.circle.MainActivity">
+            <extra android:name="route" android:value="notifications" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="profile"
+        android:enabled="true"
+        android:shortcutShortLabel="@string/shortcut_profile"
+        android:shortcutLongLabel="@string/shortcut_profile">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.nexora.circle"
+            android:targetClass="com.nexora.circle.MainActivity">
+            <extra android:name="route" android:value="profile" />
+        </intent>
+    </shortcut>
+</shortcuts>

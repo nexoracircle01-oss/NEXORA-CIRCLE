@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">NEXORA-CIRCLE</string>
+    <string name="shortcut_beams">Beams</string>
+    <string name="shortcut_notifications_short">Alerts</string>
+    <string name="shortcut_notifications_long">Notifications</string>
+    <string name="shortcut_profile">Profile</string>
 </resources>
